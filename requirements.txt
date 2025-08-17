@@ -2,3 +2,5 @@ openai>=1.52.0
 rich>=13.7.1
 click>=8.1.7
 python-dotenv>=1.0.1
+google-generativeai>=0.7.2
+zhipuai>=2.1.0
