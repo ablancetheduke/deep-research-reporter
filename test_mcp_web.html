@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 服务器测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 MCP 服务器测试页面</h1>
+        <p>这个页面用于测试 Deep Research Reporter 的 MCP 服务器功能。</p>
+        
+        <h2>服务器状态</h2>
+        <button onclick="testConnection()">测试连接</button>
+        <button onclick="listTools()">列出工具</button>
+        <button onclick="healthCheck()">健康检查</button>
+        <button onclick="listModels()">列出模型</button>
+        
+        <h2>报告生成</h2>
+        <div>
+            <label for="topic">主题:</label>
+            <input type="text" id="topic" value="人工智能发展趋势" style="width: 300px; margin: 5px;">
+        </div>
+        <div>
+            <label for="wordLimit">字数限制:</label>
+            <input type="number" id="wordLimit" value="500" style="width: 100px; margin: 5px;">
+        </div>
+        <button onclick="generateReport()">生成报告</button>
+        
+        <h2>结果</h2>
+        <div id="result" class="result">点击上面的按钮开始测试...</div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://localhost:3001';
+        let requestId = 1;
+
+        async function makeRequest(method, params = {}) {
+            const payload = {
+                jsonrpc: "2.0",
+                id: requestId++,
+                method: method,
+                params: params
+            };
+
+            try {
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                return {
+                    error: {
+                        code: -1,
+                        message: `网络错误: ${error.message}`
+                    }
+                };
+            }
+        }
+
+        function displayResult(data, title = '') {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            const content = title ? `${title} (${timestamp}):\n` : `结果 (${timestamp}):\n`;
+            
+            resultDiv.textContent = content + JSON.stringify(data, null, 2);
+            resultDiv.className = 'result ' + (data.error ? 'error' : 'success');
+        }
+
+        async function testConnection() {
+            displayResult({ loading: '正在测试连接...' });
+            const result = await makeRequest('initialize');
+            displayResult(result, '连接测试');
+        }
+
+        async function listTools() {
+            displayResult({ loading: '正在获取工具列表...' });
+            const result = await makeRequest('tools/list');
+            displayResult(result, '工具列表');
+        }
+
+        async function healthCheck() {
+            displayResult({ loading: '正在检查健康状态...' });
+            const result = await makeRequest('tools/call', {
+                name: 'health_check',
+                arguments: {}
+            });
+            displayResult(result, '健康检查');
+        }
+
+        async function listModels() {
+            displayResult({ loading: '正在获取模型列表...' });
+            const result = await makeRequest('tools/call', {
+                name: 'list_models',
+                arguments: { provider: 'all' }
+            });
+            displayResult(result, '模型列表');
+        }
+
+        async function generateReport() {
+            const topic = document.getElementById('topic').value;
+            const wordLimit = parseInt(document.getElementById('wordLimit').value);
+            
+            if (!topic) {
+                displayResult({ error: { message: '请输入主题' } });
+                return;
+            }
+
+            displayResult({ loading: '正在生成报告...' });
+            const result = await makeRequest('tools/call', {
+                name: 'generate_report',
+                arguments: {
+                    topic: topic,
+                    word_limit: wordLimit,
+                    provider: 'openai',
+                    model: 'gpt-4o-mini'
+                }
+            });
+            displayResult(result, '报告生成');
+        }
+
+        // 页面加载时自动测试连接
+        window.onload = function() {
+            testConnection();
+        };
+    </script>
+</body>
+</html>
