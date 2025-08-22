@@ -5,7 +5,7 @@ import math
 from typing import Dict, List, Tuple, Optional
 
 from .llm import LLM
-from . import prompts
+from . import prompts, retrieval
 
 
 # ---------- helpers ----------
@@ -58,12 +58,23 @@ def plan_outline(llm: LLM, intent: Dict) -> Dict:
 # ---------- section write/critique/revise ----------
 
 def write_section(llm: LLM, section: Dict) -> str:
+    # Open-book retrieval to fetch background context
+    context = ""
+    try:
+        hits = retrieval.open_book_search(section.get("title", ""), n_results=2)
+        context = "\n".join(
+            f"{h['title']}: {h['summary']}" for h in hits if h.get("summary")
+        )
+    except Exception:
+        context = ""
+
     spec = json.dumps(
         {
             "section_title": section.get("title", ""),
             "section_goal": section.get("goal", ""),
             "key_points": section.get("key_points", []),
             "target_words": section.get("target_words", 180),
+            "context": context,
         },
         ensure_ascii=False,
     )
@@ -129,7 +140,7 @@ def enforce_wordcount(llm: LLM, report: str, target_words: int) -> str:
 def _make_llm(provider: str, model: str, temperature: float = 0.35, max_tokens: int = 2200) -> LLM:
     """
     Factory to create LLM with unified defaults.
-    Providers supported by llm.LLM: openai | gemini | deepseek | chatglm
+    Providers supported by llm.LLM: openai | gemini | deepseek | chatglm | anthropic
     """
     return LLM(provider=provider, model=model, temperature=temperature, max_tokens=max_tokens)
 

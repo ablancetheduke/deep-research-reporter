@@ -28,7 +28,7 @@ def _load_topic(topic: str | None, topic_file: str | None) -> str:
 @click.option("--topic-file", "-f", help="Read topic from a text file.")
 @click.option("--words", "-w", required=True, type=int, help="Target word count.")
 @click.option("--provider", "-p",
-              type=click.Choice(["openai", "gemini", "deepseek", "chatglm"], case_sensitive=False),
+              type=click.Choice(["openai", "gemini", "deepseek", "chatglm", "anthropic"], case_sensitive=False),
               default="openai", show_default=True,
               help="LLM provider.")
 @click.option("--model", "-m", default="gpt-4o-mini", show_default=True,

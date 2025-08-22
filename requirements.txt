@@ -4,3 +4,5 @@ click>=8.1.7
 python-dotenv>=1.0.1
 google-generativeai>=0.7.2
 zhipuai>=2.1.0
+anthropic>=0.26.0
+requests>=2.31.0

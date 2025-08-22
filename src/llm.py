@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Unified LLM wrapper with multi-provider support (OpenAI, Gemini, DeepSeek, ChatGLM).
+Unified LLM wrapper with multi-provider support (OpenAI, Gemini, DeepSeek,
+ChatGLM, Anthropic/Claude).
 
 Goals:
 - Single `LLM.chat(messages, ...) -> str` interface across providers.
@@ -11,10 +12,11 @@ Goals:
 - Conservative defaults (low temperature, bounded max tokens).
 
 Environment variables (by provider):
-- OpenAI : OPENAI_API_KEY
-- Gemini : GEMINI_API_KEY
-- DeepSeek: DEEPSEEK_API_KEY  (optional DEEPSEEK_API_BASE, default https://api.deepseek.com)
-- ChatGLM: CHATGLM_API_KEY
+- OpenAI   : OPENAI_API_KEY
+- Gemini   : GEMINI_API_KEY
+- DeepSeek : DEEPSEEK_API_KEY  (optional DEEPSEEK_API_BASE, default https://api.deepseek.com)
+- ChatGLM  : CHATGLM_API_KEY
+- Anthropic: ANTHROPIC_API_KEY
 
 Message format (same as OpenAI):
     messages = [
@@ -119,9 +121,10 @@ class LLM:
         self._deepseek_client = None
         self._gemini = None
         self._chatglm_client = None
+        self._anthropic_client = None
 
         # quick provider validation
-        if self.provider not in {"openai", "gemini", "deepseek", "chatglm"}:
+        if self.provider not in {"openai", "gemini", "deepseek", "chatglm", "anthropic"}:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
     # -----------------------
@@ -154,6 +157,8 @@ class LLM:
             return self._chat_gemini(messages, model=model, temperature=temperature, max_tokens=max_tokens, **kwargs)
         if self.provider == "chatglm":
             return self._chat_chatglm(messages, model=model, temperature=temperature, max_tokens=max_tokens, **kwargs)
+        if self.provider == "anthropic":
+            return self._chat_anthropic(messages, model=model, temperature=temperature, max_tokens=max_tokens, **kwargs)
 
         raise ValueError(f"Unsupported provider: {self.provider}")
 
@@ -364,4 +369,55 @@ class LLM:
             if text:
                 return str(text).strip()
             raise LLMError("ChatGLM returned no text.")
+        return _retry_call(_call, retries=self.retries)
+
+    # -----------------------
+    # Provider: Anthropic (Claude)
+    # -----------------------
+
+    def _init_anthropic(self) -> None:
+        if self._anthropic_client is not None:
+            return
+        try:
+            from anthropic import Anthropic  # type: ignore
+        except Exception as e:  # noqa: BLE001
+            raise LLMError("Anthropic SDK not installed. `pip install anthropic>=0.26.0`") from e
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise LLMError("Missing ANTHROPIC_API_KEY.")
+        self._anthropic_client = Anthropic(api_key=api_key)
+
+    def _chat_anthropic(
+        self,
+        messages: List[Dict[str, str]],
+        *,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        **_: Any,
+    ) -> str:
+        self._init_anthropic()
+
+        system_text = "\n\n".join(m["content"] for m in messages if m["role"] == "system").strip()
+        user_msgs = [m for m in messages if m["role"] != "system"]
+        prepared = [
+            {"role": m["role"], "content": m["content"]} for m in user_msgs
+        ]
+
+        def _call() -> str:
+            resp = self._anthropic_client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system_text or None,
+                messages=prepared,
+            )
+            parts = []
+            for block in getattr(resp, "content", []) or []:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(block.get("text", ""))
+                elif hasattr(block, "text"):
+                    parts.append(getattr(block, "text"))
+            return "\n".join(p for p in parts if p).strip()
+
         return _retry_call(_call, retries=self.retries)
