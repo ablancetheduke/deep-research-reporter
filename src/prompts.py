@@ -26,6 +26,7 @@ Input:
 - section_goal
 - key_points (bullet points to cover)
 - target_words (approximate)
+- context (optional background info from retrieval)
 
 Write the section with:
 - a clear topic sentence and tight logical flow
@@ -69,3 +70,14 @@ Preserve key arguments, logic, and readability. Avoid removing headings.
 Return ONLY the adjusted report.
 TARGET_WORDS={target}
 """
+
+
+FACTCHECK_PROMPT = """You are a meticulous fact checker. Given a claim and
+supporting evidence text, decide whether the evidence supports, refutes or is
+insufficient for the claim. Respond with a JSON object {"verdict":
+"SUPPORTED"|"REFUTED"|"INSUFFICIENT", "rationale": "short explanation"}."""
+
+
+SCENARIO_PROMPT = """You are a scenario-planning analyst. From a topic and a
+time horizon, produce a brief trend analysis and 2-3 plausible future
+scenarios. Use clear headings or bullet points."""
